@@ -67,9 +67,14 @@ JoryCommonLibrary/
 │   ├── DependencyDescriptor.cs / DependencyInjectAttribute.cs
 │   ├── IContainer.cs / IRegistrator.cs / IResolver.cs / IRegistered.cs
 │   └── IOC代码解读.md            # 容器完整实现文档（建议深入阅读）
-├── Converter/                    # WPF IValueConverter 实现
-│   ├── InverseBoolenConverter.cs
-│   └── OppositeConverter.cs
+├── Converter/                    # WPF IValueConverter / IMultiValueConverter 实现
+│   ├── InverseConverter.cs                          # 合并优化：bool / Visibility / 数值 取反
+│   ├── BooleanToVisibilityConverter.cs              # bool -> Visibility（支持反转 / Hidden）
+│   ├── NullToVisibilityConverter.cs                 # null -> Collapsed
+│   ├── StringNullOrEmptyToVisibilityConverter.cs    # 空串 -> Collapsed
+│   ├── EnumToBooleanConverter.cs                    # 枚举 <-> bool（RadioButton 双向）
+│   ├── EqualityConverter.cs                         # 值相等 -> bool / Visibility
+│   └── MultiBooleanConverter.cs                     # 多值 bool 组合（Any / All）
 ├── ConsoleManager.cs             # 控制台窗口显隐
 ├── DirFile.cs                    # 目录 / 文件操作
 ├── FileOperate.cs                # 文件读写与文件夹遍历
@@ -245,23 +250,50 @@ public class Setting : PropertyChangedModel
 
 ### 6. WPF 值转换器（Jory.Common）
 
-实现 `IValueConverter`，可在 XAML 中直接引用。
-
-- `InverseBoolenConverter`：布尔取反（`true<->false`）。
-- `OppositeConverter`：对数值/布尔取相反数（按目标类型转换）。
+均实现 `IValueConverter`（除 `MultiBooleanConverter` 为 `IMultiValueConverter`），可在 XAML 中直接引用（建议统一在 `Window.Resources` / `App.Resources` 声明为静态资源）。
 
 ```xml
 <Window.Resources>
-    <local:InverseBoolenConverter x:Key="InverseBool"/>
-    <local:OppositeConverter     x:Key="Opposite"/>
+    <local:InverseConverter                        x:Key="Inverse"/>
+    <local:BooleanToVisibilityConverter            x:Key="BoolToVisible"/>
+    <local:NullToVisibilityConverter               x:Key="NullToVisible"/>
+    <local:StringNullOrEmptyToVisibilityConverter  x:Key="EmptyToVisible"/>
+    <local:EnumToBooleanConverter                  x:Key="EnumToBool"/>
+    <local:EqualityConverter                       x:Key="Equals"/>
+    <local:MultiBooleanConverter                   x:Key="MultiBool"/>
 </Window.Resources>
-
-<Button Content="开始" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"/>
 ```
 
+- **`InverseConverter`** —— 合并自原 `InverseBoolenConverter` 与 `OppositeConverter` 并做了扩展与优化：支持 `bool` 取反、`Visibility` 在 `Visible` / `Collapsed` 间切换、常用数值类型（`int` / `double` / `decimal` 等）取相反数；双向绑定安全（`ConvertBack` 与 `Convert` 互为逆操作）。
+- **`BooleanToVisibilityConverter`** —— `bool → Visibility`。参数支持：`Hidden`（不可见用 `Hidden` 而非 `Collapsed`）、`Inverse` / `!` / `Not`（反转结果）。支持 `ConvertBack`。
+- **`NullToVisibilityConverter`** —— 对象为 `null → Collapsed`；参数同上（`Inverse`、`Hidden`）。单向。
+- **`StringNullOrEmptyToVisibilityConverter`** —— 字符串为 `null` / 空 / 纯空白 `→ Collapsed`。单向。
+- **`EnumToBooleanConverter`** —— 枚举 ↔ `bool`，`ConverterParameter` 设为枚举成员名，常用于 `RadioButton` 与枚举属性双向绑定。
+- **`EqualityConverter`** —— 绑定值与参数是否相等 `→ bool`（目标为 `Visibility` 时自动转 `Visible` / `Collapsed`），优先按数值比较。单向。
+- **`MultiBooleanConverter`** —— `IMultiValueConverter`，组合多个 `bool`（参数 `Any`：任一为真即真；默认 `All`：全为真才真），目标为 `Visibility` 时转可见性。
+
 ```csharp
-var inverse = new InverseBoolenConverter();
-bool hidden = (bool)inverse.Convert(true, typeof(bool), null, null); // false
+// 代码中使用
+var inv = new InverseConverter();
+bool b = (bool)inv.Convert(true, typeof(bool), null, null);   // false
+
+// RadioButton 与枚举属性双向绑定
+// <RadioButton Content="模式A"
+//              IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=A}"/>
+// <RadioButton Content="模式B"
+//              IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=B}"/>
+```
+
+```xml
+<!-- 多值：两个开关都为 true 时按钮可用 -->
+<Button IsEnabled="{Binding Mode, Converter={StaticResource MultiBool}}">
+    <Button.IsEnabled>
+        <MultiBinding Converter="{StaticResource MultiBool}">
+            <Binding Path="IsReady"/>
+            <Binding Path="IsOnline"/>
+        </MultiBinding>
+    </Button.IsEnabled>
+</Button>
 ```
 
 ### 7. INI 文件读写 INIFile（Jory.Common）
