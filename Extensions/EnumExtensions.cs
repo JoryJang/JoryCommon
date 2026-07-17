@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Jory.Common
 {
-    public static class EnumExt
+    public static class EnumExtensions
     {
         private static readonly ConcurrentDictionary<Type, Dictionary<int, string>> EnumNameValueDict = new ConcurrentDictionary<Type, Dictionary<int, string>>();
         private static readonly ConcurrentDictionary<Type, Dictionary<string, int>> EnumValueNameDict = new ConcurrentDictionary<Type, Dictionary<string, int>>();

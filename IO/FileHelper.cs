@@ -8,7 +8,7 @@ using System.Web;
 
 namespace Jory.Common
 {
-    public class FileOperate
+    public class FileHelper
     {
         #region 写文件
         protected void Write_Txt(string FileName, string Content)
@@ -68,7 +68,7 @@ namespace Jory.Common
          * 参    数：filename:文件名称
          * 调用示列：
          *           string filename = "aaa.aspx";        
-         *           string s = Common.Utility.FileOperate.GetPostfixStr(filename);         
+         *           string s = Jory.Common.FileHelper.GetPostfixStr(filename);         
         *****************************************/
         /// <summary>
         /// 取后缀名
@@ -92,7 +92,7 @@ namespace Jory.Common
          * 调用示列：
          *           string Path = Server.MapPath("Default2.aspx");       
          *           string Strings = "这是我写的内容啊";
-         *           Common.Utility.FileOperate.WriteFile(Path,Strings);
+         *           Jory.Common.FileHelper.WriteFile(Path,Strings);
         *****************************************/
         /// <summary>
         /// 写文件
@@ -124,7 +124,7 @@ namespace Jory.Common
          * 参    数：Path:文件路径
          * 调用示列：
          *           string Path = Server.MapPath("Default2.aspx");       
-         *           string s = Common.Utility.FileOperate.ReadFile(Path);
+         *           string s = Jory.Common.FileHelper.ReadFile(Path);
         *****************************************/
         /// <summary>
         /// 读文件
@@ -156,7 +156,7 @@ namespace Jory.Common
          * 调用示列：
          *           string Path = Server.MapPath("Default2.aspx");     
          *           string Strings = "新追加内容";
-         *           Common.Utility.FileOperate.FileAdd(Path, Strings);
+         *           Jory.Common.FileHelper.FileAdd(Path, Strings);
         *****************************************/
         /// <summary>
         /// 追加文件
@@ -181,7 +181,7 @@ namespace Jory.Common
          * 调用示列：
          *           string OrignFile = Server.MapPath("Default2.aspx");     
          *           string NewFile = Server.MapPath("Default3.aspx");
-         *           Common.Utility.FileOperate.FileCoppy(OrignFile, NewFile);
+         *           Jory.Common.FileHelper.FileCoppy(OrignFile, NewFile);
         *****************************************/
         /// <summary>
         /// 拷贝文件
@@ -202,7 +202,7 @@ namespace Jory.Common
          * 参    数：Path:文件路径
          * 调用示列：
          *           string Path = Server.MapPath("Default3.aspx");    
-         *           Common.Utility.FileOperate.FileDel(Path);
+         *           Jory.Common.FileHelper.FileDel(Path);
         *****************************************/
         /// <summary>
         /// 删除文件
@@ -222,7 +222,7 @@ namespace Jory.Common
          * 调用示列：
          *            string OrignFile = Server.MapPath("../说明.txt");    
          *            string NewFile = Server.MapPath("../../说明.txt");
-         *            Common.Utility.FileOperate.FileMove(OrignFile, NewFile);
+         *            Jory.Common.FileHelper.FileMove(OrignFile, NewFile);
         *****************************************/
         /// <summary>
         /// 移动文件
@@ -243,7 +243,7 @@ namespace Jory.Common
          * 调用示列：
          *           string OrignFolder = Server.MapPath("test/");    
          *           string NewFloder = "new";
-         *           Common.Utility.FileOperate.FolderCreate(OrignFolder, NewFloder); 
+         *           Jory.Common.FileHelper.FolderCreate(OrignFolder, NewFloder); 
         *****************************************/
         /// <summary>
         /// 在当前目录下创建目录
@@ -288,7 +288,7 @@ namespace Jory.Common
          * 参    数：dir:文件夹路径
          * 调用示列：
          *           string dir = Server.MapPath("test/");  
-         *           Common.Utility.FileOperate.DeleteFolder(dir);       
+         *           Jory.Common.FileHelper.DeleteFolder(dir);       
         *****************************************/
         /// <summary>
         /// 递归删除文件夹目录及文件
@@ -320,7 +320,7 @@ namespace Jory.Common
          * 调用示列：
          *           string srcPath = Server.MapPath("test/");  
          *           string aimPath = Server.MapPath("test1/");
-         *           Common.Utility.FileOperate.CopyDir(srcPath,aimPath);   
+         *           Jory.Common.FileHelper.CopyDir(srcPath,aimPath);   
         *****************************************/
         /// <summary>
         /// 指定文件夹下面的所有内容copy到目标文件夹下面
@@ -367,7 +367,7 @@ namespace Jory.Common
          * 参    数：Path:详细路径
          * 调用示列：
          *           string strDirlist = Server.MapPath("templates");       
-         *           this.Literal1.Text = Common.Utility.FileOperate.GetFoldAll(strDirlist);  
+         *           this.Literal1.Text = Jory.Common.FileHelper.GetFoldAll(strDirlist);  
         *****************************************/
         /// <summary>
         /// 获取指定文件夹下所有子目录及文件
@@ -443,7 +443,7 @@ namespace Jory.Common
          * 参    数：Path:详细路径
          * 调用示列：
          *            string strDirlist = Server.MapPath("templates");      
-         *            this.Literal2.Text = Common.Utility.FileOperate.GetFoldAll(strDirlist,"tpl","");
+         *            this.Literal2.Text = Jory.Common.FileHelper.GetFoldAll(strDirlist,"tpl","");
         *****************************************/
         /// <summary>
         /// 获取指定文件夹下所有子目录及文件(下拉框形)
@@ -539,7 +539,7 @@ namespace Jory.Common
          * 参    数：dirPath:文件夹详细路径
          * 调用示列：
          *           string Path = Server.MapPath("templates"); 
-         *           Response.Write(Common.Utility.FileOperate.GetDirectoryLength(Path));       
+         *           Response.Write(Jory.Common.FileHelper.GetDirectoryLength(Path));       
         *****************************************/
         /// <summary>
         /// 获取文件夹大小
@@ -575,7 +575,7 @@ namespace Jory.Common
          * 参    数：filePath:文件详细路径
          * 调用示列：
          *           string file = Server.MapPath("robots.txt");  
-         *            Response.Write(Common.Utility.FileOperate.GetFileAttibe(file));         
+         *            Response.Write(Jory.Common.FileHelper.GetFileAttibe(file));         
         *****************************************/
         /// <summary>
         /// 获取指定文件详细属性

@@ -16,12 +16,12 @@
   - [1. IOC 依赖注入容器（Jory.IOC）](#1-ioc-依赖注入容器joryioc)
   - [2. 日志封装 NLogger（Jory.Log）](#2-日志封装-nloggerjorylog)
   - [3. 文件与目录操作（Jory.Common）](#3-文件与目录操作jorycommon)
-  - [4. 字节与大小端转换 SocketBitConverter（Jory.Common）](#4-字节与大小端转换-socketbitconverterjorycommon)
+  - [4. 字节与大小端转换 EndianConverter（Jory.Common）](#4-字节与大小端转换-endianconverterjorycommon)
   - [5. MVVM 基类 ViewModelBase / PropertyChangedModel（Jory.Common）](#5-mvvm-基类-viewmodelbase--propertychangedmodeljorycommon)
   - [6. WPF 值转换器（Jory.Common）](#6-wpf-值转换器jorycommon)
   - [7. INI 文件读写 INIFile（Jory.Common）](#7-ini-文件读写-inifilejorycommon)
   - [8. XML 读写 XmlHelper（Jory.Common）](#8-xml-读写-xmlhelperjorycommon)
-  - [9. 枚举扩展 EnumExt（Jory.Common）](#9-枚举扩展-enumextjorycommon)
+  - [9. 枚举扩展 EnumExtensions（Jory.Common）](#9-枚举扩展-enumextensionsjorycommon)
   - [10. 通用函数 Functions（Jory.Common）](#10-通用函数-functionsjorycommon)
   - [11. 其它小工具](#11-其它小工具)
 - [构建](#构建)
@@ -59,7 +59,7 @@ git clone https://github.com/JoryJang/JoryCommon.git
 JoryCommonLibrary/
 ├── JoryCommonLibrary.csproj      # 工程文件（FW 4.5，输出 Jory.Common.dll）
 ├── JoryCommonLibrary.slnx        # 解决方案
-├── NLog/                         # 内置 NLog.dll 及 NLog 封装
+├── NLog/                         # 内置 NLog.dll 及 NLog 封装（Jory.Log）
 │   ├── NLog.dll
 │   └── NLogger.cs
 ├── IOC/                          # 轻量级特性化依赖注入容器（Jory.IOC）
@@ -67,7 +67,7 @@ JoryCommonLibrary/
 │   ├── DependencyDescriptor.cs / DependencyInjectAttribute.cs
 │   ├── IContainer.cs / IRegistrator.cs / IResolver.cs / IRegistered.cs
 │   └── IOC代码解读.md            # 容器完整实现文档（建议深入阅读）
-├── Converter/                    # WPF IValueConverter / IMultiValueConverter 实现
+├── Converter/                    # WPF IValueConverter / IMultiValueConverter 实现（Jory.Common）
 │   ├── InverseConverter.cs                          # 合并优化：bool / Visibility / 数值 取反
 │   ├── BooleanToVisibilityConverter.cs              # bool -> Visibility（支持反转 / Hidden）
 │   ├── NullToVisibilityConverter.cs                 # null -> Collapsed
@@ -75,18 +75,25 @@ JoryCommonLibrary/
 │   ├── EnumToBooleanConverter.cs                    # 枚举 <-> bool（RadioButton 双向）
 │   ├── EqualityConverter.cs                         # 值相等 -> bool / Visibility
 │   └── MultiBooleanConverter.cs                     # 多值 bool 组合（Any / All）
-├── ConsoleManager.cs             # 控制台窗口显隐
-├── DirFile.cs                    # 目录 / 文件操作
-├── FileOperate.cs                # 文件读写与文件夹遍历
-├── Functions.cs                  # 通用函数（字符串/字节/字节序/UI 线程）
-├── EnumExt.cs                    # 枚举扩展
-├── INIFile.cs                    # INI 文件读写
-├── XmlHelper.cs                  # XML 读写
-├── SocketBitConverter.cs         # 大小端字节转换
-├── ViewModelBase.cs              # MVVM ViewModel 基类
-├── PropertyChangedModel.cs       # 通知属性基类
-├── DumpHelper.cs                 # 进程 MiniDump
-├── StopwatchHelper.cs            # 代码计时
+├── IO/                           # 文件 / 目录 / INI / XML 操作（Jory.Common）
+│   ├── DirectoryHelper.cs        # 目录与文件操作（原 DirectoryHelper）
+│   ├── FileHelper.cs             # 文件读写与文件夹遍历（原 FileHelper）
+│   ├── INIFile.cs                # INI 文件读写
+│   └── XmlHelper.cs              # XML 读写
+├── MVVM/                         # MVVM 通知属性基类（Jory.Common）
+│   ├── ViewModelBase.cs          # MVVM ViewModel 基类
+│   └── PropertyChangedModel.cs   # 通知属性基类
+├── Extensions/                   # 类型扩展（Jory.Common）
+│   └── EnumExtensions.cs         # 枚举扩展（原 EnumExt）
+├── Binary/                       # 字节与大小端转换（Jory.Common）
+│   └── EndianConverter.cs        # 大小端字节转换（原 EndianConverter）
+├── Diagnostics/                  # 诊断与调试工具（Jory.Common）
+│   ├── DumpHelper.cs             # 进程 MiniDump
+│   └── StopwatchHelper.cs        # 代码计时
+├── System/                       # 系统 / 平台辅助（Jory.Common）
+│   └── ConsoleManager.cs         # 控制台窗口显隐
+├── Utility/                      # 通用静态工具（Jory.Common）
+│   └── Functions.cs              # 通用函数（字符串/字节/字节序/UI 线程）
 └── Properties/AssemblyInfo.cs
 ```
 
@@ -178,34 +185,34 @@ finally
 
 ### 3. 文件与目录操作（Jory.Common）
 
-`DirFile` 与 `FileOperate` 提供常用静态方法（功能略有重叠，按习惯选用）。
+`DirectoryHelper` 与 `FileHelper` 提供常用静态方法（功能略有重叠，按习惯选用）。
 
 ```csharp
 using Jory.Common;
 
-// DirFile
-if (!DirFile.IsExistDirectory(@"D:\data")) DirFile.CreateDir(@"D:\data");
-DirFile.WriteText(@"D:\data\a.txt", "hello", Encoding.UTF8);
-string[] files = DirFile.GetFileNames(@"D:\data", "*.txt", isSearchChild: true);
-long size = DirFile.GetFileSize(@"D:\data\a.txt");
-DirFile.CopyFile(@"D:\data\a.txt", @"D:\data\b.txt");
-DirFile.DeleteFile(@"D:\data\b.txt");
+// DirectoryHelper
+if (!DirectoryHelper.IsExistDirectory(@"D:\data")) DirectoryHelper.CreateDir(@"D:\data");
+DirectoryHelper.WriteText(@"D:\data\a.txt", "hello", Encoding.UTF8);
+string[] files = DirectoryHelper.GetFileNames(@"D:\data", "*.txt", isSearchChild: true);
+long size = DirectoryHelper.GetFileSize(@"D:\data\a.txt");
+DirectoryHelper.CopyFile(@"D:\data\a.txt", @"D:\data\b.txt");
+DirectoryHelper.DeleteFile(@"D:\data\b.txt");
 
-// FileOperate
-FileOperate.WriteFile(@"D:\data\c.txt", "内容");
-string text = FileOperate.ReadFile(@"D:\data\c.txt");
-FileOperate.FileCoppy(@"D:\data\c.txt", @"D:\data\c2.txt");
-long dirLen = FileOperate.GetDirectoryLength(@"D:\data");
+// FileHelper
+FileHelper.WriteFile(@"D:\data\c.txt", "内容");
+string text = FileHelper.ReadFile(@"D:\data\c.txt");
+FileHelper.FileCoppy(@"D:\data\c.txt", @"D:\data\c2.txt");
+long dirLen = FileHelper.GetDirectoryLength(@"D:\data");
 ```
 
-### 4. 字节与大小端转换 SocketBitConverter（Jory.Common）
+### 4. 字节与大小端转换 EndianConverter（Jory.Common）
 
 可在**大端 / 小端**之间转换基元类型与字节数组，自动判断是否与本机字节序一致（`IsSystemEndianMatch`）。内置 `BigEndian`、`LittleEndian`、`Default` 三个静态实例。
 
 ```csharp
 using Jory.Common;
 
-var conv = SocketBitConverter.BigEndian;     // 或 LittleEndian / Default
+var conv = EndianConverter.BigEndian;     // 或 LittleEndian / Default
 byte[] bytes = conv.GetBytes(0x1234);        // ushort -> 大端字节
 ushort v = conv.ToUInt16(bytes, 0);
 
@@ -214,7 +221,7 @@ double d = conv.ToDouble(conv.GetBytes(3.14), 0);
 bool b  = conv.ToBoolean(conv.GetBytes(true), 0);
 
 // 切换默认端
-SocketBitConverter.DefaultEndianType = EndianType.Big;  // Default 随之变为 BigEndian
+EndianConverter.DefaultEndianType = EndianType.Big;  // Default 随之变为 BigEndian
 ```
 
 ### 5. MVVM 基类 ViewModelBase / PropertyChangedModel（Jory.Common）
@@ -335,7 +342,7 @@ xml.Save();
 string s = XmlHelper.GetValue(@"D:\data.xml", "/root/name");
 ```
 
-### 9. 枚举扩展 EnumExt（Jory.Common）
+### 9. 枚举扩展 EnumExtensions（Jory.Common）
 
 枚举与字典/字符串/描述互转，支持 `[Description]` 特性。
 
@@ -344,10 +351,10 @@ using Jory.Common;
 
 enum Color { [Description("红色")] Red, [Description("绿色")] Green }
 
-string desc = EnumExt.GetDescription(Color.Red);              // "红色"
-Dictionary<int, string> dict = EnumExt.GetDictionary(typeof(Color));
-Dictionary<string, int> items = EnumExt.GetValueItems(typeof(Color));
-int v = EnumExt.GetValue(typeof(Color), "Red");               // 0
+string desc = EnumExtensions.GetDescription(Color.Red);              // "红色"
+Dictionary<int, string> dict = EnumExtensions.GetDictionary(typeof(Color));
+Dictionary<string, int> items = EnumExtensions.GetValueItems(typeof(Color));
+int v = EnumExtensions.GetValue(typeof(Color), "Red");               // 0
 string name = 0.ToEnumString(typeof(Color));                 // "Red"
 ```
 

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Jory.Common
 {
-    public class DirFile
+    public class DirectoryHelper
     {
         #region 检测指定目录是否存在
         /// <summary>

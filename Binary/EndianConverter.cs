@@ -11,32 +11,32 @@ namespace Jory.Common
     /// 将基数据类型转换为指定端的一个字节数组，
     /// 或将一个字节数组转换为指定端基数据类型。
     /// </summary>
-    public class SocketBitConverter
+    public class EndianConverter
     {
         private readonly bool _isSystemEndianMatch;
 
         /// <summary>
         /// 以大端
         /// </summary>
-        public static readonly SocketBitConverter BigEndian;
+        public static readonly EndianConverter BigEndian;
 
         /// <summary>
         /// 以小端
         /// </summary>
-        public static readonly SocketBitConverter LittleEndian;
+        public static readonly EndianConverter LittleEndian;
 
-        static SocketBitConverter()
+        static EndianConverter()
         {
-            BigEndian = new SocketBitConverter(EndianType.Big);
-            LittleEndian = new SocketBitConverter(EndianType.Little);
+            BigEndian = new EndianConverter(EndianType.Big);
+            LittleEndian = new EndianConverter(EndianType.Little);
             Default = LittleEndian;
             DefaultEndianType = EndianType.Little;
         }
 
         /// <summary>
-        /// 以默认小端，可通过<see cref="SocketBitConverter.DefaultEndianType"/>重新指定默认端。
+        /// 以默认小端，可通过<see cref="EndianConverter.DefaultEndianType"/>重新指定默认端。
         /// </summary>
-        public static SocketBitConverter Default { get; private set; }
+        public static EndianConverter Default { get; private set; }
 
         private static EndianType m_defaultEndianType;
 
@@ -69,7 +69,7 @@ namespace Jory.Common
         /// 构造函数
         /// </summary>
         /// <param name="endianType"></param>
-        public SocketBitConverter(EndianType endianType)
+        public EndianConverter(EndianType endianType)
         {
             this.EndianType = endianType;
             _isSystemEndianMatch = BitConverter.IsLittleEndian == (endianType == EndianType.Little);
