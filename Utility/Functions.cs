@@ -76,7 +76,7 @@ namespace Jory.Common
         /// </summary>
         /// <param name="ch">字符</param>
         /// <returns></returns>
-        public static bool IsNumeric(char ch)
+        public static bool IsDigit(char ch)
         {
             return char.IsDigit(ch);
 
@@ -91,14 +91,14 @@ namespace Jory.Common
         /// </summary>
         /// <param name="str"></param>
         /// <returns></returns>
-        public static bool IsNumeric(string str)
+        public static bool IsDigit(string str)
         {
             if (string.IsNullOrEmpty(str)) 
                 return false;
 
             for (int i = 0; i < str.Length; i++)
             {
-                if (IsNumeric(str[i]) == false)
+                if (IsDigit(str[i]) == false)
                 {
                     return false;
                 }
@@ -146,7 +146,7 @@ namespace Jory.Common
         {
             for (int i = 0; i < str.Length; i++)
             {
-                if (IsNumeric(str[i]) == false && IsLetter(str[i]) == false)
+                if (IsDigit(str[i]) == false && IsLetter(str[i]) == false)
                 {
                     return false;
                 }
@@ -159,7 +159,7 @@ namespace Jory.Common
         /// </summary>
         /// <param name="ipStr"></param>
         /// <returns></returns>
-        public static bool IsValidIP(string ipStr)
+        public static bool IsValidIPAddress(string ipStr)
         {
             if (string.IsNullOrEmpty(ipStr))
             {
@@ -171,7 +171,13 @@ namespace Jory.Common
             return r.IsMatch(ipStr);
         }
 
-        public static bool IsValidMac(string macStr)
+        /// <summary>
+        /// 验证指定字符串是否是合法的 MAC 地址。
+        /// 支持的分隔符为 : . -，例如 00:1A:2B:3C:4D:5E、00-1A-2B-3C-4D-5E。
+        /// </summary>
+        /// <param name="macStr">待验证的 MAC 地址字符串。</param>
+        /// <returns>合法返回 true；空串或不匹配格式返回 false。</returns>
+        public static bool IsValidMacAddress(string macStr)
         {
             if (string.IsNullOrEmpty(macStr))
             {
@@ -188,9 +194,9 @@ namespace Jory.Common
         /// </summary>
         /// <param name="ch">字符串</param>
         /// <returns></returns>
-        public static bool IsHexChar(char ch)
+        public static bool IsHexDigit(char ch)
         {
-            return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F');
+            return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f');
             //string str = CharToString(ch);
 
             //Regex regex = new Regex("^[A-Fa-f]+$");
@@ -202,11 +208,11 @@ namespace Jory.Common
         /// </summary>
         /// <param name="str">字符串</param>
         /// <returns></returns>
-        public static bool IsHexStr(string str)
+        public static bool IsHexString(string str)
         {
             for (int i = 0; i < str.Length; i++)
             {
-                if (IsHexChar(str[i]) == false)
+                if (IsHexDigit(str[i]) == false)
                 {
                     return false;
                 }
@@ -233,8 +239,21 @@ namespace Jory.Common
         /// <param name="str"></param>
         /// <returns></returns>
         public static string RemoveWhiteSpace(this string str)
-        {
-            return new string(str.ToCharArray().Where(c => !char.IsWhiteSpace(c)).ToArray());
+        {       
+            if (string.IsNullOrEmpty(str))
+                return str;
+
+            StringBuilder sb = new StringBuilder(str.Length);
+
+            foreach (char c in str)
+            {
+                if (!char.IsWhiteSpace(c))
+                    sb.Append(c);
+            }
+
+            return sb.ToString();
+
+            //return new string(str.ToCharArray().Where(c => !char.IsWhiteSpace(c)).ToArray());
         }
 
         #endregion 字符串与字符校验
@@ -329,7 +348,7 @@ namespace Jory.Common
         /// 获取串口列表
         /// </summary>
         /// <returns></returns>
-        public static string[] GetComList()
+        public static string[] GetSerialPortNames()
         {
             try
             {
@@ -357,7 +376,7 @@ namespace Jory.Common
                 return;
             }
 
-            if (IsMainThread(Application.Current.Dispatcher.Thread))
+            if (IsUIThread(Application.Current.Dispatcher.Thread))
             {
                 action();
             }
@@ -409,7 +428,7 @@ namespace Jory.Common
         /// WPF当前线程是否主线程
         /// </summary>
         /// <returns></returns>
-        public static bool IsMainThread(System.Threading.Thread thread)
+        public static bool IsUIThread(System.Threading.Thread thread)
         {
             return thread == System.Threading.Thread.CurrentThread;
         }
@@ -419,7 +438,13 @@ namespace Jory.Common
 
         #region 可视化树查找
 
-        //查找对象下第一个指定类型和名称的可视子对象
+        /// <summary>
+        /// 在可视化树中深度优先查找第一个匹配指定类型且 Name 相符的可视子对象。
+        /// </summary>
+        /// <typeparam name="T">目标依赖对象类型。</typeparam>
+        /// <param name="obj">查找的起点对象。</param>
+        /// <param name="childName">子对象的 Name（FrameworkElement.Name 属性值）。</param>
+        /// <returns>匹配到的子对象；未找到返回 null。</returns>
         public static T FindFirstVisualChild<T>(DependencyObject obj, string childName) where T : DependencyObject
         {
             int count = VisualTreeHelper.GetChildrenCount(obj);
@@ -442,7 +467,12 @@ namespace Jory.Common
             return null;
         }
 
-        //查找对象之上第一个指定类型的祖先对象
+        /// <summary>
+        /// 沿可视化树向上查找第一个匹配指定类型的祖先对象（从起点的父级开始向上搜索）。
+        /// </summary>
+        /// <typeparam name="T">目标祖先类型。</typeparam>
+        /// <param name="obj">起始对象。</param>
+        /// <returns>匹配到的祖先对象；未找到或父级链不满足类型时返回 default(T)。</returns>
         public static T FindFirstVisualAncestor<T>(DependencyObject obj) where T : DependencyObject
         {
             DependencyObject CurObj = obj;
@@ -571,7 +601,7 @@ namespace Jory.Common
         /// <param name="inPlace">true 直接修改并返回原数组；false 返回新数组。</param>
         /// <param name="reverseTail">当数据长度不是 4 的倍数时，是否把剩余字节顺序整体翻转。</param>
         /// <returns></returns>
-        public static byte[] ReversePerUInt32(byte[] source, int length = 0, bool inPlace = true, bool reverseTail = false)
+        public static byte[] SwapEndian32(byte[] source, int length = 0, bool inPlace = true, bool reverseTail = false)
         {
             if (source == null) throw new ArgumentNullException("source");
 
@@ -657,7 +687,7 @@ namespace Jory.Common
         /// <param name="DataInt">10进制</param>
         /// <param name="Len">长度</param>
         /// <returns></returns>
-        public static string Convert10To16String(int dataInt, int Len = 2)
+        public static string ToHexString(int dataInt, int Len = 2)
         {
             //string Value16 = Convert.ToString(DataInt, 16);
             ////补足位数
@@ -686,7 +716,7 @@ namespace Jory.Common
 
             hex = hex.Replace(" ", "").Replace("-", "");
 
-            if (!IsHexStr(hex))
+            if (!IsHexString(hex))
             {
                 return new byte[] { };
             }
@@ -800,9 +830,7 @@ namespace Jory.Common
         /// <param name="length"></param>
         /// <returns></returns>
         public static Array GetRange(this Array sourceArray, int sourceIndex, int length)
-        {
-            Array destinationArray = new Array[length];
-
+        {     
             if (sourceIndex < 0 || sourceIndex >= sourceArray.Length)
             {
                 throw new ArgumentOutOfRangeException("起始点小于0或大于数组长度");
@@ -812,6 +840,8 @@ namespace Jory.Common
             {
                 throw new ArgumentOutOfRangeException("起始点加截取长度大于数组长度");
             }
+
+            Array destinationArray = Array.CreateInstance(sourceArray.GetType().GetElementType(), length);
 
             Array.Copy(sourceArray, sourceIndex, destinationArray, 0, length);
 
@@ -856,7 +886,7 @@ namespace Jory.Common
         /// <param name="array"></param>
         /// <param name="begIndex"></param>
         /// <returns></returns>
-        public static short ToShort(this byte[] array, int begIndex = 0)
+        public static short ToBigEndianInt16(this byte[] array, int begIndex = 0)
         {
             if (begIndex + 2 <= array.Length)
             {
@@ -878,7 +908,7 @@ namespace Jory.Common
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static int ToInt32(this byte[] data, int begIndex = 0)
+        public static int ToBigEndianInt32(this byte[] data, int begIndex = 0)
         {
             if (data == null)
             {
@@ -906,7 +936,7 @@ namespace Jory.Common
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static long ToInt64(this byte[] data, int begIndex = 0)
+        public static long ToBigEndianInt64(this byte[] data, int begIndex = 0)
         {
             if (data == null)
             {
@@ -929,9 +959,14 @@ namespace Jory.Common
             return result;
         }
 
-        public static ulong ToUInt64(this byte[] data)
+        /// <summary>
+        /// 将字节数组按大端字节序转换为 64 位无符号整数（UInt64）。
+        /// </summary>
+        /// <param name="data">字节数组（一般应为 8 字节，不足时按实际长度读取）。</param>
+        /// <returns>转换后的 UInt64 值。</returns>
+        public static ulong ToBigEndianUInt64(this byte[] data)
         {
-            return (ulong)data.ToInt64();
+            return (ulong)data.ToBigEndianInt64();
         }
 
         /// <summary>
