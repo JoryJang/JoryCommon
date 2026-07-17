@@ -1,0 +1,24 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userprefs
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.slnx.user
+
+# NuGet
+packages/
+*.nupkg
+
+# Misc
+Thumbs.db
+Desktop.ini
+[Dd]ebug/
+[Rr]elease/
+
+# Internal agent/tooling memory (not part of the library)
+.workbuddy/
