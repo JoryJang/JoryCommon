@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UEM.IOC
+namespace Jory.IOC
 {
     /// <summary>
     /// IOC 容器总接口。

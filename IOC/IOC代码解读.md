@@ -1,7 +1,7 @@
-# UEM.IOC 依赖注入容器 — 代码解读
+# Jory.IOC 依赖注入容器 — 代码解读
 
 > 一个轻量级、基于特性的（Attribute 驱动）.NET 依赖注入（DI / IOC）容器实现。
-> 命名空间：`UEM.IOC`
+> 命名空间：`Jory.IOC`
 
 ---
 
@@ -67,7 +67,7 @@ public enum Lifetime
 注册表内部是 `ConcurrentDictionary<string, DependencyDescriptor>`，键的格式为：
 
 ```
-$"{fromType.FullName}{key}"     // 例如 "UEM.IDemo.Demo" 或 "UEM.IDemo.Demo#mysql"
+$"{fromType.FullName}{key}"     // 例如 "Jory.IDemo.Demo" 或 "Jory.IDemo.Demo#mysql"
 ```
 
 - 不传 `key` 时即按 `FullName` 注册（默认实现）。
@@ -213,7 +213,7 @@ bool okA = container.IsRegistered<IService>("keyA");
 ### 8.1 基础接口 + 实现 + 注入
 
 ```csharp
-using UEM.IOC;
+using Jory.IOC;
 
 public interface ILog { void Write(string msg); }
 public class ConsoleLog : ILog { public void Write(string msg) => Console.WriteLine(msg); }

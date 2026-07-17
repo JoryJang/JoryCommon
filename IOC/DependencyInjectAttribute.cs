@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UEM.IOC
+namespace Jory.IOC
 {
     /// <summary>
     /// 依赖注入标记特性。

@@ -9,7 +9,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UEM.Log
+namespace Jory.Log
 {
     public class NLogger
     {

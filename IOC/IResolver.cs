@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UEM.IOC
+namespace Jory.IOC
 {
     /// <summary>
     /// 服务解析器接口：根据已注册的映射关系创建（解析）出服务实例，并自动完成依赖注入。

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UEM.IOC
+namespace Jory.IOC
 {
     /// <summary>
     /// 依赖描述符：承载“一条注册记录”的全部元信息。

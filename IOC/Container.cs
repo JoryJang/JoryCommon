@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace UEM.IOC
+namespace Jory.IOC
 {
     /// <summary>
     /// IOC 容器核心实现（线程安全）。

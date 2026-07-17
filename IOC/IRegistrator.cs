@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UEM.IOC
+namespace Jory.IOC
 {
     /// <summary>
     /// 容器注册器接口：负责把“服务抽象”与“实现”建立映射关系，并提供反注册与查询能力。
