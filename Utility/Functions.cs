@@ -844,7 +844,7 @@ namespace Jory.Common
                 sb.Append(separator);
             }
 
-            string hexStr = sb.Length > 1 ? sb.ToString(0, sb.Length - 1) : sb.ToString();
+            string hexStr = sb.ToString().TrimEnd(separator.ToCharArray());
 
             return hexStr;
         }

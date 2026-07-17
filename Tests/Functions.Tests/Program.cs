@@ -440,7 +440,7 @@ namespace Jory.Tests.FunctionsLib
             byte[] arr = { 0x48, 0x65, 0x6C };
             // 注意：被测代码 ToHexStr 在 separator 为空时，sb.Length-1 会误截最后一个 hex 字符
             //（{48,65,6C} 期望 "48656C" 实际 "48656"）。此为 Functions.cs 已知问题，这里记录实际行为。
-            AreEqual("48656", arr.ToHexStr(), "被测代码 separator 为空时丢失末字符（已知问题）");
+            AreEqual("48656C", arr.ToHexStr());
             AreEqual("48-65-6C", arr.ToHexStr("-"));
             AreEqual("48 65 6C", arr.ToHexStr(" "));
             // 空集合
