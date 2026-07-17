@@ -3,9 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Jory.IOC
 {
@@ -16,14 +14,14 @@ namespace Jory.IOC
     /// </summary>
     /// <remarks>
     /// 目标框架：.NET Framework 4.5。为保证在 C# 5 编译器下亦可编译，本文件刻意不使用
-    /// nameof 与字符串插值（\"$\" 语法），统一改用字符串字面量与 string.Format。
+    /// nameof 与字符串插值（“$” 语法），统一改用字符串字面量与 string.Format。
     /// </remarks>
     public sealed class Container : IContainer, IDisposable
     {
         #region 字段
 
         /// <summary>
-        /// 注册表：键 = "服务类型全名 + Key"，值 = 依赖描述符。
+        /// 注册表：键 = “服务类型全名 + Key”，值 = 依赖描述符。
         /// 使用线程安全的 ConcurrentDictionary 存储。
         /// </summary>
         private readonly ConcurrentDictionary<string, DependencyDescriptor> m_registrations
@@ -51,16 +49,40 @@ namespace Jory.IOC
         private readonly ThreadLocal<Stack<Type>> m_resolveStack
             = new ThreadLocal<Stack<Type>>(() => new Stack<Type>());
 
+        /// <summary>
+        /// 是否跟踪瞬态实例（含 ResolveWithoutRoot 创建的实例）并在 Dispose 时统一释放。
+        /// 默认 false：符合主流 DI 容器（Autofac/Unity/MS DI）的约定——瞬态由调用方自行管理，
+        /// 避免长期运行的服务因瞬态无限累积而内存泄漏。
+        /// 如需旧行为（容器自动跟踪并释放瞬态），请使用 new Container(true)。
+        /// 单例实例始终由容器跟踪，不受此开关影响。
+        /// </summary>
+        private readonly bool m_trackTransients;
+
+        /// <summary>释放标志：0 = 未释放，1 = 已释放。用 Interlocked 保证线程安全。</summary>
+        private int m_disposed;
+
         #endregion
 
         #region 构造
 
         /// <summary>
-        /// 创建容器，并把容器自身注册为 IResolver / IServiceProvider（单例），
+        /// 创建容器（默认不跟踪瞬态），并把容器自身注册为 IResolver / IServiceProvider（单例），
         /// 从而允许把容器本身作为依赖注入（例如某服务需要 IResolver 来动态解析其它服务）。
         /// </summary>
-        public Container()
+        public Container() : this(false)
         {
+        }
+
+        /// <summary>
+        /// 创建容器，并指定是否跟踪瞬态实例。
+        /// </summary>
+        /// <param name="trackTransients">
+        /// true：瞬态与 ResolveWithoutRoot 创建的可释放实例也由容器跟踪并在 Dispose 时释放（旧行为，注意可能的内存累积）；
+        /// false（默认）：仅跟踪单例，瞬态由调用方自行释放（推荐，可配合 Release(instance) 显式回收）。
+        /// </param>
+        public Container(bool trackTransients)
+        {
+            m_trackTransients = trackTransients;
             this.RegisterSingleton<IResolver>(this);
             this.RegisterSingleton<IServiceProvider>(this);
         }
@@ -72,19 +94,24 @@ namespace Jory.IOC
         /// <inheritdoc/>
         public IResolver BuildResolver()
         {
+            ThrowIfDisposed();
             return this;
         }
 
         /// <inheritdoc/>
+        /// <summary>
+        /// 返回所有已注册描述符的快照（ToArray 复制），避免外部枚举期间注册表变更引发异常。
+        /// </summary>
         public IEnumerable<DependencyDescriptor> GetDescriptors()
         {
-            return m_registrations.Values;
+            return m_registrations.Values.ToArray();
         }
 
         /// <inheritdoc/>
         /// <summary>兼容 IServiceProvider：直接转发到 Resolve。</summary>
         public object GetService(Type serviceType)
         {
+            ThrowIfDisposed();
             // 兼容 IServiceProvider 约定：未注册的类型返回 null（而非抛异常）；
             // 已注册但构造失败（如循环依赖）仍会冒泡异常，便于排查。
             if (serviceType == null)
@@ -134,16 +161,30 @@ namespace Jory.IOC
         /// <inheritdoc/>
         public void Register(DependencyDescriptor descriptor, string key)
         {
+            ThrowIfDisposed();
             if (descriptor == null)
             {
                 throw new ArgumentNullException("descriptor");
+            }
+            if (descriptor.FromType == null)
+            {
+                throw new ArgumentException("descriptor.FromType 不能为 null。", "descriptor");
             }
 
             string k = key == null
                 ? descriptor.FromType.FullName
                 : string.Format("{0}{1}", descriptor.FromType.FullName, key);
+
             // 重复注册后者覆盖（AddOrUpdate 的更新函数直接返回新值）。
-            m_registrations.AddOrUpdate(k, descriptor, (existingKey, existingValue) => descriptor);
+            // 覆盖前清理旧描述符持有的单例实例登记，避免旧实例残留在 m_disposables 中造成双重释放或泄漏。
+            m_registrations.AddOrUpdate(k, descriptor, (existingKey, existingValue) =>
+            {
+                if (existingValue != descriptor)
+                {
+                    UntrackDisposable(existingValue);
+                }
+                return descriptor;
+            });
         }
 
         /// <inheritdoc/>
@@ -155,6 +196,7 @@ namespace Jory.IOC
         /// <inheritdoc/>
         public void Unregister(DependencyDescriptor descriptor, string key)
         {
+            ThrowIfDisposed();
             if (descriptor == null)
             {
                 throw new ArgumentNullException("descriptor");
@@ -163,7 +205,12 @@ namespace Jory.IOC
             string k = key == null
                 ? descriptor.FromType.FullName
                 : string.Format("{0}{1}", descriptor.FromType.FullName, key);
-            m_registrations.TryRemove(k, out _);
+            DependencyDescriptor old;
+            if (m_registrations.TryRemove(k, out old))
+            {
+                // 移除注册时，把旧单例实例从待释放集合中摘除（由调用方决定是否自行 Dispose）。
+                UntrackDisposable(old);
+            }
         }
 
         #endregion
@@ -182,6 +229,79 @@ namespace Jory.IOC
             return ResolveCore(fromType, key);
         }
 
+        /// <summary>
+        /// 解析（创建）一个“未注册的根类型”实例，并按构造函数 / 属性 / 方法三级注入其成员依赖。
+        /// 适用于“目标类型本身不注册到容器，但其成员依赖已注册”的场景。
+        /// <para>
+        /// 与扩展方法 <see cref="ContainerExtension.ResolveWithoutRoot(IResolver, Type)"/> 相比，本实例方法
+        /// 复用容器内部的反射缓存、循环依赖检测，并完整支持属性与方法注入（扩展方法在非 Container 时走 fallback）。
+        /// </para>
+        /// </summary>
+        /// <param name="fromType">要创建的根类型（无需注册）。</param>
+        /// <returns>创建并注入完成后的实例。</returns>
+        public object ResolveWithoutRoot(Type fromType)
+        {
+            ThrowIfDisposed();
+            if (fromType == null)
+            {
+                throw new ArgumentNullException("fromType");
+            }
+
+            Stack<Type> stack = m_resolveStack.Value;
+            if (stack.Contains(fromType))
+            {
+                string chain = string.Join(" -> ", stack.Reverse().Select(t => t.FullName))
+                                + " -> " + fromType.FullName;
+                throw new InvalidOperationException("检测到循环依赖：" + chain);
+            }
+
+            stack.Push(fromType);
+            try
+            {
+                InjectionInfo info = m_injectionCache.GetOrAdd(fromType, ComputeInjectionInfo);
+                object instance = InstantiateAndInject(info, fromType);
+                // 行为与瞬态一致：是否由容器跟踪受 m_trackTransients 控制。
+                TrackIfDisposable(instance, m_trackTransients);
+                return instance;
+            }
+            finally
+            {
+                stack.Pop();
+            }
+        }
+
+        /// <summary>
+        /// 显式释放一个由容器创建（且被跟踪）的实例：从待释放集合移除并调用其 Dispose。
+        /// 用于在使用完瞬态实例后主动回收，避免长时间持有造成内存压力。
+        /// 若实例未被容器跟踪（如 trackTransients=false 创建的瞬态，或用户显式注册的单例实例），本方法不做任何事。
+        /// </summary>
+        /// <param name="instance">要释放的实例。</param>
+        public void Release(object instance)
+        {
+            if (instance == null)
+            {
+                return;
+            }
+
+            IDisposable d = instance as IDisposable;
+            if (d == null)
+            {
+                return;
+            }
+
+            if (m_disposables.TryRemove(d, out _))
+            {
+                try
+                {
+                    d.Dispose();
+                }
+                catch
+                {
+                    // 忽略单个释放异常，避免影响调用方。
+                }
+            }
+        }
+
         #endregion
 
         #region 解析核心
@@ -195,6 +315,7 @@ namespace Jory.IOC
         /// <returns>解析得到的实例。</returns>
         private object ResolveCore(Type fromType, string key)
         {
+            ThrowIfDisposed();
             if (fromType == null)
             {
                 throw new ArgumentNullException("fromType");
@@ -325,16 +446,41 @@ namespace Jory.IOC
         #region 实例创建与依赖注入
 
         /// <summary>
-        /// 创建实现类型实例，并完成“构造 / 属性 / 方法”三级依赖注入。
+        /// 创建实现类型实例，并完成“构造 / 属性 / 方法”三级依赖注入；随后触发 OnResolved 回调并登记可释放实例。
         /// 注入信息（构造函数选择、需注入的属性与方法）优先从缓存读取，避免重复反射。
         /// </summary>
-        /// <param name="descriptor">本条注册的描述符（用于触发 OnResolved 回调）。</param>
+        /// <param name="descriptor">本条注册的描述符（用于触发 OnResolved 回调，可为 null 表示无回调）。</param>
         /// <param name="toType">实际要实例化的类型（可能已套用泛型参数）。</param>
         /// <returns>创建好的实例。</returns>
         private object Create(DependencyDescriptor descriptor, Type toType)
         {
             InjectionInfo info = m_injectionCache.GetOrAdd(toType, ComputeInjectionInfo);
+            object instance = InstantiateAndInject(info, toType);
 
+            // 解析完成回调（单例仅触发一次；瞬态每次触发）。
+            if (descriptor != null && descriptor.OnResolved != null)
+            {
+                descriptor.OnResolved.Invoke(instance);
+            }
+
+            // 单例始终跟踪；瞬态根据 m_trackTransients 决定。
+            bool track = descriptor == null
+                ? m_trackTransients
+                : (descriptor.Lifetime == Lifetime.Singleton || m_trackTransients);
+            TrackIfDisposable(instance, track);
+
+            return instance;
+        }
+
+        /// <summary>
+        /// 按注入信息实例化类型并完成“构造 / 属性 / 方法”三级注入。
+        /// 该方法被 Create（已注册类型）与 ResolveWithoutRoot（未注册根类型）共用，保证注入逻辑一致且共享反射缓存。
+        /// </summary>
+        /// <param name="info">类型的注入信息（来自缓存）。</param>
+        /// <param name="toType">要实例化的类型。</param>
+        /// <returns>实例化并注入完成后的实例。</returns>
+        private object InstantiateAndInject(InjectionInfo info, Type toType)
+        {
             // 根据类上的 [DependencyType] 决定启用哪些注入方式；无特性则三种都进行。
             DependencyTypeAttribute typeAttr = info.DependencyTypeAttribute;
             bool doCtor = typeAttr == null || typeAttr.Type.HasFlag(DependencyType.Constructor);
@@ -346,10 +492,13 @@ namespace Jory.IOC
             if (doCtor)
             {
                 ParameterInfo[] parameters = info.Ctor.GetParameters();
-                ctorArgs = new object[parameters.Length];
-                for (int i = 0; i < parameters.Length; i++)
+                if (parameters.Length > 0)
                 {
-                    ctorArgs[i] = ResolveParameter(parameters[i]);
+                    ctorArgs = new object[parameters.Length];
+                    for (int i = 0; i < parameters.Length; i++)
+                    {
+                        ctorArgs[i] = ResolveParameter(parameters[i]);
+                    }
                 }
             }
 
@@ -383,18 +532,6 @@ namespace Jory.IOC
 
                     method.Invoke(instance, args);
                 }
-            }
-
-            // 解析完成回调（单例仅触发一次；瞬态每次触发）。
-            if (descriptor.OnResolved != null)
-            {
-                descriptor.OnResolved.Invoke(instance);
-            }
-
-            // 若实例由容器创建且可释放，登记以便容器 Dispose 时回收。
-            if (instance is IDisposable disposable)
-            {
-                m_disposables.TryAdd(disposable, 1);
             }
 
             return instance;
@@ -481,14 +618,57 @@ namespace Jory.IOC
 
         #endregion
 
+        #region 释放管理辅助
+
+        /// <summary>若实例实现了 IDisposable 且满足跟踪条件，则登记到待释放集合。</summary>
+        private void TrackIfDisposable(object instance, bool track)
+        {
+            if (track && instance is IDisposable d)
+            {
+                m_disposables.TryAdd(d, 0);
+            }
+        }
+
+        /// <summary>把描述符持有的单例实例从待释放集合中摘除（不主动 Dispose，交由调用方/GC 处理）。</summary>
+        private void UntrackDisposable(DependencyDescriptor descriptor)
+        {
+            if (descriptor == null)
+            {
+                return;
+            }
+
+            object inst = descriptor.ToInstance;
+            if (inst is IDisposable d)
+            {
+                m_disposables.TryRemove(d, out _);
+            }
+        }
+
+        /// <summary>容器已释放则抛 ObjectDisposedException，防止释放后误用。</summary>
+        private void ThrowIfDisposed()
+        {
+            if (Interlocked.CompareExchange(ref m_disposed, 0, 0) != 0)
+            {
+                throw new ObjectDisposedException("Container", "容器已被释放，不能再进行注册或解析操作。");
+            }
+        }
+
+        #endregion
+
         #region IDisposable
 
         /// <summary>
-        /// 释放容器：释放所有由容器创建且实现 IDisposable 的实例（单例与瞬态均包含）。
+        /// 释放容器：释放所有由容器创建且实现 IDisposable 的实例（默认仅单例；若启用 trackTransients 则含瞬态）。
         /// 注意：用户通过 RegisterSingleton(instance) 显式传入的实例不会被释放（由用户管理其生命周期）。
         /// </summary>
         public void Dispose()
         {
+            // 原子置位，保证只释放一次。
+            if (Interlocked.Exchange(ref m_disposed, 1) != 0)
+            {
+                return;
+            }
+
             foreach (IDisposable d in m_disposables.Keys)
             {
                 try

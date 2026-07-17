@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="JoryCommonLibrary.csproj" />
+  <Project Path="Tests\Functions.Tests\Jory.Functions.Tests.csproj" Id="9b3c2a44-8e1f-4a2b-9c7d-3f4e222a1023" />
+  <Project Path="Tests\IOC.Tests\Jory.IOC.Tests.csproj" Id="8a2c1b33-7d9e-4f1a-9b6c-2e3d111a0f12" />
 </Solution>

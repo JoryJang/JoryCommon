@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Jory.IOC
 {
@@ -20,6 +16,15 @@ namespace Jory.IOC
         /// <param name="instance">已创建好的实例（将作为单例缓存）。</param>
         public DependencyDescriptor(Type fromType, object instance)
         {
+            if (fromType == null)
+            {
+                throw new ArgumentNullException("fromType");
+            }
+            if (instance == null)
+            {
+                throw new ArgumentNullException("instance");
+            }
+
             this.FromType = fromType;
             this.ToInstance = instance;
             this.Lifetime = Lifetime.Singleton;   // 持有实例即视为单例
@@ -35,9 +40,38 @@ namespace Jory.IOC
         /// <param name="lifetime">生命周期（单例 / 瞬态）。</param>
         public DependencyDescriptor(Type fromType, Type toType, Lifetime lifetime)
         {
+            if (fromType == null)
+            {
+                throw new ArgumentNullException("fromType");
+            }
+            if (toType == null)
+            {
+                throw new ArgumentNullException("toType");
+            }
+
             this.FromType = fromType;
             this.Lifetime = lifetime;
             this.ToType = toType;
+        }
+
+        /// <summary>
+        /// 以“抽象类型 + 生命周期”初始化一条描述符，配合 <see cref="ImplementationFactory"/> 使用。
+        /// 主要供工厂注册（RegisterSingleton/RegisterTransient 的 func 重载）使用：实例由工厂创建，
+        /// 因此 ToType 不参与实例化，此处设为 fromType 仅作占位（避免错误地匹配到 (Type, object) 重载，
+        /// 把 Lifetime 枚举值装箱为单例实例——那会导致工厂委托永不执行、解析返回一个枚举值）。
+        /// </summary>
+        /// <param name="fromType">服务抽象类型。</param>
+        /// <param name="lifetime">生命周期（单例 / 瞬态）。</param>
+        public DependencyDescriptor(Type fromType, Lifetime lifetime)
+        {
+            if (fromType == null)
+            {
+                throw new ArgumentNullException("fromType");
+            }
+
+            this.FromType = fromType;
+            this.Lifetime = lifetime;
+            this.ToType = fromType;   // 工厂场景下不参与实例化，占位
         }
 
         /// <summary>
@@ -46,6 +80,11 @@ namespace Jory.IOC
         /// <param name="fromType">服务抽象类型。</param>
         public DependencyDescriptor(Type fromType)
         {
+            if (fromType == null)
+            {
+                throw new ArgumentNullException("fromType");
+            }
+
             this.FromType = fromType;
         }
 

@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Jory.IOC
 {
@@ -319,7 +316,7 @@ namespace Jory.IOC
 
         #region Resolve（解析）
 
-        /// <summary>泛型解析：按默认 Key 创建 T 类型实例。</summary>
+        /// <summary>泛型解析：按默认 key 创建 T 类型实例。</summary>
         public static T Resolve<T>(this IResolver resolver)
         {
             return (T)resolver.Resolve(typeof(T));
@@ -332,67 +329,132 @@ namespace Jory.IOC
         }
 
         /// <summary>
-        /// 创建未注册的根类型实例（瞬态）：适用于“目标类型未注册，但其成员依赖已注册”的场景，
+        /// 创建未注册的根类型实例：适用于“目标类型未注册，但其成员依赖已注册”的场景，
         /// 按构造函数 / 属性 / 方法注入其成员依赖。不进入容器注册表。
+        /// <para>
+        /// 若 resolver 为 <see cref="Container"/>，则优先调用其实例方法以复用反射缓存、
+        /// 循环依赖检测，并完整支持三级注入；否则走 fallback（无缓存，但同样支持三级注入）。
+        /// </para>
         /// </summary>
-        /// <exception cref="Exception">目标类型没有任何公共构造函数时抛出。</exception>
         public static object ResolveWithoutRoot(this IResolver resolver, Type fromType)
         {
-            // 选择构造函数：优先带 [DependencyInject]；否则取参数最多的公共构造函数。
-            var ctor = fromType.GetConstructors().FirstOrDefault(x => x.IsDefined(typeof(DependencyInjectAttribute), true));
-            if (ctor == null)
+            Container container = resolver as Container;
+            if (container != null)
             {
-                if (fromType.GetConstructors().Length == 0)
-                {
-                    throw new Exception(string.Format("没有找到类型{0}的公共构造函数。", fromType.FullName));
-                }
-
-                ctor = fromType.GetConstructors().OrderByDescending(x => x.GetParameters().Length).First();
+                return container.ResolveWithoutRoot(fromType);
             }
 
-            // 读取类上 [DependencyType]，决定是否进行构造注入。
-            DependencyTypeAttribute dependencyTypeAttribute = null;
-            if (fromType.IsDefined(typeof(DependencyTypeAttribute), true))
-            {
-                dependencyTypeAttribute = fromType.GetCustomAttribute<DependencyTypeAttribute>();
-            }
-
-            var parameters = ctor.GetParameters();
-            var ps = new object[parameters.Length];
-
-            if (dependencyTypeAttribute == null || dependencyTypeAttribute.Type.HasFlag(DependencyType.Constructor))
-            {
-                for (var i = 0; i < parameters.Length; i++)
-                {
-                    if (parameters[i].ParameterType.IsPrimitive || parameters[i].ParameterType == typeof(string))
-                    {
-                        ps[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : null;
-                    }
-                    else if (parameters[i].IsDefined(typeof(DependencyInjectAttribute), true))
-                    {
-                        var attribute = parameters[i].GetCustomAttribute<DependencyInjectAttribute>();
-                        var type = attribute.Type ?? parameters[i].ParameterType;
-                        ps[i] = resolver.Resolve(type, attribute.Key);
-                    }
-                    else
-                    {
-                        ps[i] = resolver.Resolve(parameters[i].ParameterType);
-                    }
-                }
-            }
-
-            if (ps == null || ps.Length == 0)
-            {
-                return Activator.CreateInstance(fromType);
-            }
-
-            return Activator.CreateInstance(fromType, ps);
+            return ResolveWithoutRootFallback(resolver, fromType);
         }
 
-        /// <summary>泛型版本：创建未注册的根类型 T 实例（瞬态）。</summary>
+        /// <summary>泛型版本：创建未注册的根类型 T 实例。</summary>
         public static T ResolveWithoutRoot<T>(this IResolver resolver)
         {
             return (T)ResolveWithoutRoot(resolver, typeof(T));
+        }
+
+        /// <summary>
+        /// 非 Container 的 IResolver 所用的 fallback 实现：
+        /// 完整支持构造函数 / 属性 / 方法三级注入（修复早期版本仅做构造注入的缺陷），但不带反射缓存。
+        /// </summary>
+        private static object ResolveWithoutRootFallback(IResolver resolver, Type fromType)
+        {
+            if (fromType == null)
+            {
+                throw new ArgumentNullException("fromType");
+            }
+
+            // 选择构造函数：优先带 [DependencyInject]；否则取参数最多的公共构造函数。
+            ConstructorInfo ctor = fromType.GetConstructors()
+                .FirstOrDefault(c => c.IsDefined(typeof(DependencyInjectAttribute), true));
+            if (ctor == null)
+            {
+                ConstructorInfo[] ctors = fromType.GetConstructors();
+                if (ctors.Length == 0)
+                {
+                    throw new InvalidOperationException(
+                        string.Format("类型 {0} 没有可访问的公共构造函数。", fromType.FullName));
+                }
+
+                ctor = ctors.OrderByDescending(c => c.GetParameters().Length).First();
+            }
+
+            DependencyTypeAttribute typeAttr = fromType.IsDefined(typeof(DependencyTypeAttribute), true)
+                ? fromType.GetCustomAttribute<DependencyTypeAttribute>()
+                : null;
+            bool doCtor = typeAttr == null || typeAttr.Type.HasFlag(DependencyType.Constructor);
+            bool doProp = typeAttr == null || typeAttr.Type.HasFlag(DependencyType.Property);
+            bool doMethod = typeAttr == null || typeAttr.Type.HasFlag(DependencyType.Method);
+
+            object instance;
+            if (doCtor)
+            {
+                ParameterInfo[] parameters = ctor.GetParameters();
+                object[] args = new object[parameters.Length];
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    args[i] = ResolveMemberFor(resolver, parameters[i].ParameterType,
+                        parameters[i].GetCustomAttribute<DependencyInjectAttribute>(),
+                        parameters[i].HasDefaultValue ? parameters[i].DefaultValue : null);
+                }
+
+                instance = args.Length == 0
+                    ? Activator.CreateInstance(fromType)
+                    : Activator.CreateInstance(fromType, args);
+            }
+            else
+            {
+                instance = Activator.CreateInstance(fromType);
+            }
+
+            if (doProp)
+            {
+                foreach (PropertyInfo prop in fromType.GetProperties()
+                    .Where(p => p.IsDefined(typeof(DependencyInjectAttribute), true) && p.CanWrite))
+                {
+                    DependencyInjectAttribute attr = prop.GetCustomAttribute<DependencyInjectAttribute>();
+                    object value = ResolveMemberFor(resolver, prop.PropertyType, attr, null);
+                    prop.SetValue(instance, value);
+                }
+            }
+
+            if (doMethod)
+            {
+                foreach (MethodInfo method in fromType.GetMethods(
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+                    .Where(m => m.IsDefined(typeof(DependencyInjectAttribute), true)))
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    object[] args = new object[parameters.Length];
+                    for (int i = 0; i < parameters.Length; i++)
+                    {
+                        args[i] = ResolveMemberFor(resolver, parameters[i].ParameterType,
+                            parameters[i].GetCustomAttribute<DependencyInjectAttribute>(),
+                            parameters[i].HasDefaultValue ? parameters[i].DefaultValue : null);
+                    }
+
+                    method.Invoke(instance, args);
+                }
+            }
+
+            return instance;
+        }
+
+        /// <summary>
+        /// fallback 专用：解析单个成员依赖。基础类型 / 字符串返回 fallback 值（如参数默认值或 null）；
+        /// 否则按 [DependencyInject] 的 Type/Key 或声明类型解析。
+        /// </summary>
+        private static object ResolveMemberFor(IResolver resolver, Type memberType,
+            DependencyInjectAttribute attr, object fallback)
+        {
+            if (memberType.IsPrimitive || memberType == typeof(string))
+            {
+                return fallback;
+            }
+
+            Type resolveType = (attr != null && attr.Type != null) ? attr.Type : memberType;
+            string resolveKey = attr != null ? attr.Key : null;
+            return resolver.Resolve(resolveType, resolveKey);
         }
 
         /// <summary>
@@ -429,6 +491,19 @@ namespace Jory.IOC
         public static T TryResolve<T>(this IResolver resolver, string key)
         {
             return (T)TryResolve(resolver, typeof(T), key);
+        }
+
+        /// <summary>
+        /// 显式释放一个由容器创建并跟踪的实例（仅对 Container 有效）。
+        /// 非 Container 的 resolver 调用本方法为空操作。
+        /// </summary>
+        public static void Release(this IResolver resolver, object instance)
+        {
+            Container container = resolver as Container;
+            if (container != null)
+            {
+                container.Release(instance);
+            }
         }
 
         #endregion Resolve
