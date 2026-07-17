@@ -366,28 +366,6 @@ namespace Jory.Common
         #region UI 线程调度
 
         /// <summary>
-        /// 更新UI数据
-        /// </summary>
-        /// <param name="action"></param>
-        public static void UpdateUIData(Action action)
-        {
-            if (System.Windows.Application.Current == null || action == null)
-            {
-                return;
-            }
-
-            if (IsUIThread(Application.Current.Dispatcher.Thread))
-            {
-                action();
-            }
-            else
-            {
-                System.Windows.Application.Current.Dispatcher.Invoke(action);
-            }
-        }
-
-
-        /// <summary>
         /// 在 UI 线程上同步执行操作。
         /// 若当前已在 UI 线程或调度器不可用，则直接执行。
         /// </summary>
@@ -422,15 +400,6 @@ namespace Jory.Common
                 // 在UI线程，直接执行
                 action();
             }
-        }
-
-        /// <summary>
-        /// WPF当前线程是否主线程
-        /// </summary>
-        /// <returns></returns>
-        public static bool IsUIThread(System.Threading.Thread thread)
-        {
-            return thread == System.Threading.Thread.CurrentThread;
         }
 
         #endregion UI 线程调度
