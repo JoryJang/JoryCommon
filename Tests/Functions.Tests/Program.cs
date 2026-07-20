@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using Jory.Common;
 
 // 注意：本测试命名空间故意不用 *Functions 结尾，否则标识符 Functions 会被
@@ -50,6 +51,12 @@ namespace Jory.Tests.FunctionsLib
         {
             try { Console.OutputEncoding = Encoding.UTF8; } catch { }
             Console.WriteLine("================ Jory.Common.Functions 测试套件 ================");
+
+          
+            var t2 = StopwatchHelper.Execute(TestBinaryHexRoundtrip);
+            var t1 = StopwatchHelper.Measure(TestBinaryHexRoundtrip);
+
+            Console.WriteLine($"测试时间 - Measure: {t1} ms, Execute: {t2} ms");
 
             // ---- 字符串与字符校验 ----
             Run("01. CharToString", TestCharToString);
@@ -230,9 +237,7 @@ namespace Jory.Tests.FunctionsLib
         {
             IsTrue(Functions.IsLetter("Hello"));
             IsFalse(Functions.IsLetter("Hello1"));
-            // 注意：被测代码 IsLetter(string) 未做空串检查，空串返回 true
-            //（与 IsDigit(string) 的空串返回 false 行为不一致）
-            IsTrue(Functions.IsLetter(""));
+            IsFalse(Functions.IsLetter(""));
         }
 
         // 06
@@ -495,13 +500,13 @@ namespace Jory.Tests.FunctionsLib
         // 29
         private static void TestRangeToInt()
         {
-            AreEqual(0x1234, new byte[] { 0x12, 0x34, 0x56 }.RangeToInt(0, 2));
-            AreEqual(0x3456, new byte[] { 0x12, 0x34, 0x56 }.RangeToInt(1, 2));
-            AreEqual(0x56, new byte[] { 0x12, 0x34, 0x56 }.RangeToInt(2, 1));
+            AreEqual(0x1234, new byte[] { 0x12, 0x34, 0x56 }.SubarrayToBigEndianInt32(0, 2));
+            AreEqual(0x3456, new byte[] { 0x12, 0x34, 0x56 }.SubarrayToBigEndianInt32(1, 2));
+            AreEqual(0x56, new byte[] { 0x12, 0x34, 0x56 }.SubarrayToBigEndianInt32(2, 1));
             // length>4 抛异常
-            Throws<ArgumentOutOfRangeException>(() => new byte[] { 1, 2, 3, 4, 5 }.RangeToInt(0, 5));
+            Throws<ArgumentOutOfRangeException>(() => new byte[] { 1, 2, 3, 4, 5 }.SubarrayToBigEndianInt32(0, 5));
             // 越界
-            Throws<ArgumentOutOfRangeException>(() => new byte[] { 1, 2 }.RangeToInt(0, 3));
+            Throws<ArgumentOutOfRangeException>(() => new byte[] { 1, 2 }.SubarrayToBigEndianInt32(0, 3));
         }
 
         // 30
@@ -624,10 +629,10 @@ namespace Jory.Tests.FunctionsLib
             {
                 Functions.CreateDir(tmpDir);
                 var sample = new XmlSample("张三", 30);
-                IsTrue(Functions.SaveToXml(sample, path));
+                IsTrue(Functions.SerializeToXml(sample, path));
                 IsTrue(File.Exists(path));
 
-                var loaded = Functions.LoadFromXml<XmlSample>(path);
+                var loaded = Functions.DeserializeFromXml<XmlSample>(path);
                 IsNotNull(loaded);
                 AreEqual("张三", loaded.Name);
                 AreEqual(30, loaded.Age);
@@ -643,7 +648,7 @@ namespace Jory.Tests.FunctionsLib
         private static void TestLoadFromXmlMissing()
         {
             string missing = Path.Combine(Path.GetTempPath(), "not_exist_" + Guid.NewGuid().ToString("N") + ".xml");
-            var result = Functions.LoadFromXml<XmlSample>(missing);
+            var result = Functions.DeserializeFromXml<XmlSample>(missing);
             IsNull(result, "文件不存在应返回 default(null)");
         }
 
