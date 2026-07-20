@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Jory.Common;
+using Jory.Log;
 
 // 注意：本测试命名空间故意不用 *Functions 结尾，否则标识符 Functions 会被
 // 编译器解析为祖先命名空间（而非 Jory.Common.Functions 类）。
@@ -49,9 +50,11 @@ namespace Jory.Tests.FunctionsLib
 
         private static void Main()
         {
+            Jory.Log.NLogger.Init("Tests", useAsyncFile: false);
             try { Console.OutputEncoding = Encoding.UTF8; } catch { }
             Console.WriteLine("================ Jory.Common.Functions 测试套件 ================");
-
+            Log.NLogger.WriteDebug("================ Jory.Common.Functions 测试套件1 ================");
+            Log.NLogger.WriteInfo("================ Jory.Common.Functions 测试套件2 ================"); 
           
             var t2 = StopwatchHelper.Execute(TestBinaryHexRoundtrip);
             var t1 = StopwatchHelper.Measure(TestBinaryHexRoundtrip);
@@ -115,6 +118,13 @@ namespace Jory.Tests.FunctionsLib
             Console.WriteLine("  通过: {0}    失败: {1}    总计: {2}", s_passed, s_failed, s_passed + s_failed);
             Console.ResetColor();
             Console.WriteLine("================================================================");
+
+            NLogger.WriteInfo("  通过: {0}    失败: {1}    总计: {2}", s_passed, s_failed, s_passed + s_failed);
+
+            NLogger.WriteInfo("测试完成。");
+
+            //NLogger.WriteError("测试没通过。");
+
             if (s_failed > 0) Environment.ExitCode = 1;
         }
 
