@@ -290,7 +290,7 @@ namespace Jory.Tests.FunctionsLib
         {
             IsTrue(Functions.IsHexString("0123456789ABCDEF"));
             IsTrue(Functions.IsHexString("abcdef"));
-            IsFalse(Functions.IsHexString("0x1F"));
+            IsTrue(Functions.IsHexString("0x1F"));
             IsFalse(Functions.IsHexString("GGGG"));
         }
 

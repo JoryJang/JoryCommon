@@ -3,12 +3,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Ports;
-using System.Linq;
-using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Xml.Serialization;
@@ -43,10 +40,11 @@ namespace Jory.Common
         {
             if (!File.Exists(FilePathFull))
             {
-                FileStream fs;
-                fs = File.Create(FilePathFull);
-                fs.Close();
-                File.SetAttributes(FilePathFull, FileAttributes.Normal);
+                using (FileStream fs = File.Create(FilePathFull))
+                {
+                    // using 确保即便后续操作异常，句柄也会被释放
+                }
+                //File.SetAttributes(FilePathFull, FileAttributes.Normal);
             }
             return true;
         }
@@ -93,7 +91,7 @@ namespace Jory.Common
         /// <returns></returns>
         public static bool IsDigit(string str)
         {
-            if (string.IsNullOrEmpty(str)) 
+            if (string.IsNullOrEmpty(str))
                 return false;
 
             for (int i = 0; i < str.Length; i++)
@@ -127,6 +125,9 @@ namespace Jory.Common
         /// <returns></returns>
         public static bool IsLetter(string str)
         {
+            if (string.IsNullOrEmpty(str))
+                return false;
+
             for (int i = 0; i < str.Length; i++)
             {
                 if (IsLetter(str[i]) == false)
@@ -144,6 +145,9 @@ namespace Jory.Common
         /// <returns></returns>
         public static bool IsNumericOrLetter(string str)
         {
+            if (string.IsNullOrEmpty(str))
+                return false;
+
             for (int i = 0; i < str.Length; i++)
             {
                 if (IsDigit(str[i]) == false && IsLetter(str[i]) == false)
@@ -159,6 +163,10 @@ namespace Jory.Common
         /// </summary>
         /// <param name="ipStr"></param>
         /// <returns></returns>
+        private static readonly Regex IpAddressRegex = new Regex(
+            @"^((0|1[0-9]{0,2}|2[0-9]{0,1}|2[0-4][0-9]|25[0-5]|[3-9][0-9]{0,1})\.){3}(0|1[0-9]{0,2}|2[0-9]{0,1}|2[0-4][0-9]|25[0-5]|[3-9][0-9]{0,1})$",
+            RegexOptions.Compiled);
+
         public static bool IsValidIPAddress(string ipStr)
         {
             if (string.IsNullOrEmpty(ipStr))
@@ -166,9 +174,7 @@ namespace Jory.Common
                 return false;
             }
 
-            Regex r = new Regex(@"^((0|1[0-9]{0,2}|2[0-9]{0,1}|2[0-4][0-9]|25[0-5]|[3-9][0-9]{0,1})\.){3}(0|1[0-9]{0,2}|2[0-9]{0,1}|2[0-4][0-9]|25[0-5]|[3-9][0-9]{0,1})$");
-
-            return r.IsMatch(ipStr);
+            return IpAddressRegex.IsMatch(ipStr);
         }
 
         /// <summary>
@@ -177,16 +183,18 @@ namespace Jory.Common
         /// </summary>
         /// <param name="macStr">待验证的 MAC 地址字符串。</param>
         /// <returns>合法返回 true；空串或不匹配格式返回 false。</returns>
+        private static readonly Regex MacAddressRegex = new Regex(
+            @"^([0-9A-Fa-f]{2}[:.-]){5}([0-9A-Fa-f]{2})$",
+            RegexOptions.Compiled);
+
         public static bool IsValidMacAddress(string macStr)
         {
             if (string.IsNullOrEmpty(macStr))
             {
                 return false;
             }
-            string pattern = @"^([0-9A-Fa-f]{2}[:.-]){5}([0-9A-Fa-f]{2})$";
-            Regex regex = new Regex(pattern);
-            bool result = regex.IsMatch(macStr);
-            return result;
+
+            return MacAddressRegex.IsMatch(macStr);
         }
 
         /// <summary>
@@ -210,13 +218,26 @@ namespace Jory.Common
         /// <returns></returns>
         public static bool IsHexString(string str)
         {
-            for (int i = 0; i < str.Length; i++)
+            // 1. 处理空字符串情况
+            if (string.IsNullOrEmpty(str)) return false;
+
+            int startIndex = 0;
+
+            // 2. 检查并跳过 "0x" 或 "0X" 前缀
+            if (str.Length >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
             {
-                if (IsHexDigit(str[i]) == false)
-                {
-                    return false;
-                }
+                startIndex = 2;
             }
+
+            // 3. 如果去掉前缀后字符串为空（即输入刚好是 "0x"），则不合法
+            if (startIndex >= str.Length) return false;
+
+            // 4. 从 startIndex 开始遍历检查剩余字符
+            for (int i = startIndex; i < str.Length; i++)
+            {
+                if (!IsHexDigit(str[i])) return false;
+            }
+
             return true;
         }
 
@@ -227,10 +248,12 @@ namespace Jory.Common
         /// <returns></returns>
         public static string ReverseString(string str)
         {
+            if (string.IsNullOrEmpty(str))
+                return str;
+
             char[] arr = str.ToCharArray();
             Array.Reverse(arr);
-            string reverseStr = new string(arr);
-            return reverseStr;
+            return new string(arr);
         }
 
         /// <summary>
@@ -239,7 +262,7 @@ namespace Jory.Common
         /// <param name="str"></param>
         /// <returns></returns>
         public static string RemoveWhiteSpace(this string str)
-        {       
+        {
             if (string.IsNullOrEmpty(str))
                 return str;
 
@@ -267,7 +290,7 @@ namespace Jory.Common
         /// <typeparam name="T"></typeparam>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static T LoadFromXml<T>(string path)
+        public static T DeserializeFromXml<T>(string path)
         {
             if (!File.Exists(path))
             {
@@ -296,7 +319,7 @@ namespace Jory.Common
         /// <typeparam name="T"></typeparam>
         /// <param name="ob"></param>
         /// <param name="path"></param>
-        public static bool SaveToXml<T>(T ob, string path)
+        public static bool SerializeToXml<T>(T ob, string path)
         {
             try
             {
@@ -381,8 +404,8 @@ namespace Jory.Common
         }
 
         /// <summary>
-        /// 在 UI 线程上异步执行操作（不阻塞调用线程），返回可 await 的 Task。
-        /// 若当前已在 UI 线程或调度器不可用，则直接执行。
+        /// 在 UI 线程上异步执行操作（不阻塞调用线程，不等待执行完成）。
+        /// 若当前已在 UI 线程或调度器不可用，则直接同步执行。
         /// </summary>
         public static void BeginInvokeOnUiThread(Action action)
         {
@@ -420,7 +443,7 @@ namespace Jory.Common
             for (int i = 0; i < count; i++)
             {
                 DependencyObject child = VisualTreeHelper.GetChild(obj, i);
-                if ((child != null) && (child is T) && child.GetValue(FrameworkElement.NameProperty).ToString() == childName)
+                if (child != null && child is T && child is FrameworkElement fe && fe.Name == childName)
                 {
                     return (T)child;
                 }
@@ -462,7 +485,7 @@ namespace Jory.Common
         /// 将字节数组转换为结构体
         /// </summary>
         /// <param name="bytes">字节数组</param>
-        /// <param name="strcutType">结构体类型</param>
+        /// <param name="startIndex">起始索引</param>
         /// <returns>转换出的结构体</returns>
         public static T BytesToStruct<T>(byte[] bytes, int startIndex = 0) where T : struct
         {
@@ -678,30 +701,53 @@ namespace Jory.Common
         /// <returns></returns>
         public static byte[] HexToByteArray(string hex)
         {
-            if (hex.Length <= 0)
+            if (string.IsNullOrEmpty(hex))
             {
-                return new byte[] { };
+                return new byte[0];
             }
 
+            // 1. 去除空格和连字符
             hex = hex.Replace(" ", "").Replace("-", "");
 
-            if (!IsHexString(hex))
+            // 2. 检查并跳过 "0x" 或 "0X" 前缀
+            int startIndex = 0;
+            if (hex.Length >= 2 && hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X'))
             {
-                return new byte[] { };
+                startIndex = 2;
             }
 
-            if (hex.Length % 2 != 0)
+            int effectiveLength = hex.Length - startIndex;
+            if (effectiveLength <= 0)
             {
-                hex = string.Format("0{0}", hex);
+                return new byte[0];
             }
 
-            byte[] buff = new byte[hex.Length / 2];
+            // 3. 奇数长度补0（在有效内容前面补0，而不是整个字符串前面）
+            if (effectiveLength % 2 != 0)
+            {
+                hex = hex.Insert(startIndex, "0");
+                effectiveLength++;
+            }
+
+            byte[] buff = new byte[effectiveLength / 2];
             int index = 0;
-            for (int i = 0; i < hex.Length; i += 2)
+
+            // 4. 单次遍历解析，若遇到非法字符直接返回空数组
+            for (int i = startIndex; i < hex.Length; i += 2)
             {
-                buff[index] = Convert.ToByte(hex.Substring(i, 2), 16);
-                ++index;
+                // 提取2个字符
+                string byteStr = hex.Substring(i, 2);
+
+                // 校验这两个字符是否为合法的16进制字符
+                if (!IsHexDigit(byteStr[0]) || !IsHexDigit(byteStr[1]))
+                {
+                    return new byte[0]; // 发现非法字符，直接终止并返回空数组
+                }
+
+                buff[index] = Convert.ToByte(byteStr, 16);
+                index++;
             }
+
             return buff;
         }
 
@@ -775,19 +821,28 @@ namespace Jory.Common
         /// <returns></returns>
         public static byte[] GetRange(this byte[] sourceArray, int sourceIndex, int length)
         {
-            if (sourceIndex < 0 || sourceIndex >= sourceArray.Length)
+            if (sourceArray == null)
             {
-                throw new ArgumentOutOfRangeException("起始点小于0或大于数组长度");
+                throw new ArgumentNullException(nameof(sourceArray));
+            }
+
+            if (sourceIndex < 0 || sourceIndex > sourceArray.Length || length < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sourceIndex), "起始点小于0或大于数组长度");
             }
 
             if (sourceIndex + length > sourceArray.Length)
             {
-                throw new ArgumentOutOfRangeException("起始点加截取长度大于数组长度");
+                throw new ArgumentOutOfRangeException(nameof(length), "起始点加截取长度大于数组长度");
             }
+
+            if (length == 0)
+            {
+                return new byte[0];
+            }
+
             byte[] destinationArray = new byte[length];
-
             Buffer.BlockCopy(sourceArray, sourceIndex, destinationArray, 0, length);
-
             return destinationArray;
         }
 
@@ -799,21 +854,24 @@ namespace Jory.Common
         /// <param name="length"></param>
         /// <returns></returns>
         public static Array GetRange(this Array sourceArray, int sourceIndex, int length)
-        {     
-            if (sourceIndex < 0 || sourceIndex >= sourceArray.Length)
+        {
+            if (sourceArray == null)
             {
-                throw new ArgumentOutOfRangeException("起始点小于0或大于数组长度");
+                throw new ArgumentNullException(nameof(sourceArray));
+            }
+
+            if (sourceIndex < 0 || sourceIndex > sourceArray.Length || length < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sourceIndex), "起始点小于0或大于数组长度");
             }
 
             if (sourceIndex + length > sourceArray.Length)
             {
-                throw new ArgumentOutOfRangeException("起始点加截取长度大于数组长度");
+                throw new ArgumentOutOfRangeException(nameof(length), "起始点加截取长度大于数组长度");
             }
 
             Array destinationArray = Array.CreateInstance(sourceArray.GetType().GetElementType(), length);
-
             Array.Copy(sourceArray, sourceIndex, destinationArray, 0, length);
-
             return destinationArray;
         }
 
@@ -836,17 +894,22 @@ namespace Jory.Common
         /// <returns>返回转换后等效的16进制的字符串</returns>
         public static string ToHexStr(this IEnumerable<byte> array, string separator = "")
         {
+            if (array == null)
+                return string.Empty;
+
             StringBuilder sb = new StringBuilder();
+            bool isFirst = true;
             foreach (byte b in array)
             {
-                sb.Append(b.ToHexStr());
-
-                sb.Append(separator);
+                if (!isFirst && !string.IsNullOrEmpty(separator))
+                {
+                    sb.Append(separator);
+                }
+                sb.AppendFormat("{0:X2}", b);
+                isFirst = false;
             }
 
-            string hexStr = sb.ToString().TrimEnd(separator.ToCharArray());
-
-            return hexStr;
+            return sb.ToString();
         }
 
         /// <summary>
@@ -894,7 +957,7 @@ namespace Jory.Common
             for (int i = 0; i < length; i++)
             {
                 byte dValue = data[i + begIndex];
-                result = result | (dValue << ((length - i - 1) * 8));
+                result = result |(dValue << ((length - i - 1) * 8));
             }
 
             return result;
@@ -945,11 +1008,16 @@ namespace Jory.Common
         /// <param name="begIndex"></param>
         /// <param name="length"></param>
         /// <returns></returns>
-        public static int RangeToInt(this byte[] array, int begIndex, int length)
+        public static int SubarrayToBigEndianInt32(this byte[] array, int begIndex, int length)
         {
-            if (length > 4 || begIndex + length > array.Length)
+            if (array == null)
             {
-                throw new ArgumentOutOfRangeException("length");
+                throw new ArgumentNullException(nameof(array));
+            }
+
+            if (begIndex < 0 || length < 0 || length > 4 || begIndex + length > array.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(length), "length不能大于4，且起始点加长度不能超过数组长度");
             }
 
             int result = 0;
